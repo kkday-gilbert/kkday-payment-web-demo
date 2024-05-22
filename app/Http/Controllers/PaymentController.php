@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use GibberishAES\GibberishAES;
+
+use function Symfony\Component\String\u;
 
 class PaymentController extends Controller
 {
@@ -26,7 +29,37 @@ class PaymentController extends Controller
         }
 
         $availablePaymentList = [];
+        $conditionList = [
+            [
+                'type' => '15',
+                'value' => $currencyCode
+            ],
+            [
+                'type' => '11',
+                'value' => $langCode
+            ]
+        ];
 
+        $list_api_endpoint = sprintf('%s/%s', config('url.kkday_payment_url'), config('url.kkday_payment_list_endpoint'));
+        $response = Http::get($list_api_endpoint, [
+            'lang_code' => $langCode,
+            'json' => [
+                'condition_list' => $conditionList,
+            ],
+            'need_detail' => '1',
+        ])->json();
+        Log::info('payment.list.response', $response);
+        $availablePaymentChannel = array_map(function ($data) {
+            return [
+                'id' => $data['pmch_oid'],
+                'name' => $data['pmch_name'],
+                'url' => $data['pmch_pay_url'],
+                'method' => $data['payment_method'],
+            ];
+        }, $response['data']['pmch_list']);
+
+
+        // mock here first to test
         if ($langCode === 'zh-tw' && $currencyCode === 'TWD') {
             $availablePaymentList = ['tappay', 'linepay'];
         }
@@ -35,8 +68,6 @@ class PaymentController extends Controller
             $list[$paymentType] = $this->getPaymentData($paymentType);
             return $list;
         }, []);
-
-        Log::info('payment_list', $paymentList);
 
 
 
@@ -54,6 +85,7 @@ class PaymentController extends Controller
         return view('payment', [
             'langCode' => $langCode,
             'currencyCode' => $currencyCode,
+            'availablePaymentChannel' => $availablePaymentChannel,
             'paymentList' => $paymentList,
         ]);
     }

@@ -68,8 +68,10 @@
             </div>
         @endforeach
     </div>
-
 </div>
+<pre>
+        {{ json_encode($availablePaymentChannel, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}
+</pre>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const optionForm = document.getElementById('payment-form')
