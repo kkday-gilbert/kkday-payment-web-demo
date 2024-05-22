@@ -10,14 +10,31 @@ use GibberishAES\GibberishAES;
 
 class PaymentController extends Controller
 {
-    public function mainPage()
+    public function mainPage(Request $request)
     {
+        $langCode = $request->query('lang');
+        $currencyCode = $request->query('currency');
+
+        if (!$langCode || !$currencyCode) {
+            $langCode = $langCode ?? 'zh-tw';
+            $currencyCode = $currencyCode ?? 'TWD';
+            return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), $langCode, $currencyCode));
+        }
+
+        $availablePaymentList = [];
+
+        if ($langCode === 'zh-tw' && $currencyCode === 'TWD') {
+            $availablePaymentList = ['credit-card', 'line-pay'];
+        }
+
         $paymentMeta = [
             'credit-card' => $this->getPaymentData('tappay'),
             'line-pay' =>  $this->getPaymentData('linepay'),
         ];
 
         return view('payment', [
+            'langCode' => $langCode,
+            'currencyCode' => $currencyCode,
             'paymentData' => $paymentMeta,
         ]);
     }

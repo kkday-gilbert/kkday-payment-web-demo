@@ -10,14 +10,41 @@
 <body class="bg-gray-100 flex items-center justify-center h-screen">
 @csrf
 <div class="bg-white p-6 rounded shadow-md w-full max-w-md">
+    <div class="bg-gray-200 p-4 rounded mb-6">
+        <div class="mb-4">
+            <label class="block">
+                <span class="text-gray-700 font-bold text-lg">Currency</span>
+                <select id="currency-selector" class="form-select mt-1 block w-full p-2 border border-gray-300 rounded">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="JPY">JPY</option>
+                    <option value="TWD">TWD</option>
+                    <!-- Add more currencies as needed -->
+                </select>
+            </label>
+        </div>
+        <div class="mb-4">
+            <label class="block">
+                <span class="text-gray-700 font-bold text-lg">Language</span>
+                <select id="language-selector" class="form-select mt-1 block w-full p-2 border border-gray-300 rounded">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="zh-tw">Chinese (Taiwan)</option>
+                    <option value="jp">Japan</option>
+                    <!-- Add more languages as needed -->
+                </select>
+            </label>
+        </div>
+    </div>
+
     <h2 class="text-2xl font-bold mb-4"> Select Payment Method </h2>
     <form id="payment-form">
         <div class="mb-4">
             <label class="inline-flex items-center">
-                <input id="credit-card-option" type="radio" class="form-radio" name="option" value="credit-card" checked>
+                <input id="credit-card-option" type="radio" class="form-radio" name="option" value="credit-card"
+                       checked>
                 <span class="ml-2"> Credit Card </span>
             </label>
-
         </div>
 
         <div class="mb-4">
@@ -85,16 +112,35 @@
         }
 
         optionForm.addEventListener('change', function (event) {
-            console.log(event)
             if (event.target.name !== 'option') {
                 return;
             }
-
-            console.log(`change form: ${event.target.value}`)
             payComponents.forEach(component => component.classList.add('hidden'));
             const selectedPayComponent = document.getElementById(event.target.value)
             selectedPayComponent.classList.remove('hidden')
         })
+        const currencySelector = document.getElementById('currency-selector');
+        const languageSelector = document.getElementById('language-selector');
+
+        function redirectToUpdatedPage() {
+            const currency = currencySelector.value;
+            const language = languageSelector.value;
+            const newUrl = `${window.location.pathname}?currency=${currency}&language=${language}`;
+            console.log(`redirect to new page ${newUrl}`);
+            window.location.href = newUrl;
+        }
+        const defaultCurrencyOption = currencySelector.querySelector('option[value={{$currencyCode}}]');
+        const defaultLangOption = languageSelector.querySelector('option[value={{$langCode}}]');
+        if (defaultLangOption) {
+            defaultLangOption.selected = true
+        }
+
+        if (defaultCurrencyOption) {
+            defaultCurrencyOption.selected = true
+        }
+
+        currencySelector.addEventListener('change', redirectToUpdatedPage);
+        languageSelector.addEventListener('change', redirectToUpdatedPage);
     });
 </script>
 </body>
