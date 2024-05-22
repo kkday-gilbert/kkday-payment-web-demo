@@ -18,24 +18,43 @@ class PaymentController extends Controller
         if (!$langCode || !$currencyCode) {
             $langCode = $langCode ?? 'zh-tw';
             $currencyCode = $currencyCode ?? 'TWD';
+            Log::info('payment.query', [
+                'lang' => $langCode,
+                'currency' => $currencyCode,
+            ]);
             return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), $langCode, $currencyCode));
         }
 
         $availablePaymentList = [];
 
         if ($langCode === 'zh-tw' && $currencyCode === 'TWD') {
-            $availablePaymentList = ['credit-card', 'line-pay'];
+            $availablePaymentList = ['tappay', 'linepay'];
         }
 
-        $paymentMeta = [
-            'credit-card' => $this->getPaymentData('tappay'),
-            'line-pay' =>  $this->getPaymentData('linepay'),
-        ];
+        $paymentList = array_reduce($availablePaymentList, function (array $list, string $paymentType) {
+            $list[$paymentType] = $this->getPaymentData($paymentType);
+            return $list;
+        }, []);
+
+        Log::info('payment_list', $paymentList);
+
+
+
+//        $paymentList = [
+//            'credit-card' => [
+//                'name' => 'Credit Card',
+//                'data' => $this->getPaymentData('tappay'),
+//            ],
+//            'line-pay' =>  [
+//                'name' => 'Line Pay',
+//                'data' => $this->getPaymentData('linepay'),
+//            ],
+//        ];
 
         return view('payment', [
             'langCode' => $langCode,
             'currencyCode' => $currencyCode,
-            'paymentData' => $paymentMeta,
+            'paymentList' => $paymentList,
         ]);
     }
 
@@ -135,8 +154,11 @@ class PaymentController extends Controller
         $encodedJsonData = $this->encryptBody(json_encode($jsondata));
 
         return [
-            'actionUrl' => config('url.kkday_payment_url') . Arr::get($pmch_value, 'url'),
-            'body' => $encodedJsonData
+            'name' => data_get($pmch_value, 'name', 'Unknown'),
+            'data' => [
+                'actionUrl' => config('url.kkday_payment_url') . Arr::get($pmch_value, 'url'),
+                'body' => $encodedJsonData
+            ],
         ];
     }
 }

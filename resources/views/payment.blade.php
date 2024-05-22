@@ -39,78 +39,50 @@
 
     <h2 class="text-2xl font-bold mb-4"> Select Payment Method </h2>
     <form id="payment-form">
-        <div class="mb-4">
-            <label class="inline-flex items-center">
-                <input id="credit-card-option" type="radio" class="form-radio" name="option" value="credit-card"
-                       checked>
-                <span class="ml-2"> Credit Card </span>
-            </label>
-        </div>
-
-        <div class="mb-4">
-            <label class="inline-flex items-center">
-                <input id="line-pay-option" type="radio" class="form-radio" name="option" value="line-pay">
-                <span class="ml-2"> Line Pay </span>
-            </label>
-        </div>
+        @foreach ($paymentList as $paymentType => $paymentData)
+            <div class="mb-4">
+                <label class="inline-flex items-center">
+                    <input id="{{$paymentType}}-option" type="radio" class="form-radio" name="option"
+                           value="{{$paymentType}}">
+                    <span class="ml-2"> {{ $paymentData['name'] }} </span>
+                </label>
+            </div>
+        @endforeach
     </form>
     <div>
-        <div id="credit-card" class="component bg-blue-100 p-4 rounded">
-            <div class="mb-4">
-                <label class="block">
-                    <span class="text-gray-700 font-bold">Card Number</span>
-                    <input type="text" name="card_number" class="form-input mt-1 block w-full"
-                           placeholder="1234 5678 9012 3456">
-                </label>
+        @foreach($paymentList as $paymentType => $paymentData)
+            <div id="{{ $paymentType }}" class="pay-component hidden">
+                @if($paymentType === 'tappay')
+                    @include('components.credit-card',[
+                        'paymentUrl' => $paymentData['data']['actionUrl'],
+                        'encodedData' => $paymentData['data']['body'],
+                    ])
+                @else
+                    @include(
+                     'components.button-pay', [
+                     'paymentUrl' => $paymentData['data']['actionUrl'],
+                     'encodedData' => $paymentData['data']['body'],
+                     'displayText' => sprintf('Go To %s', $paymentData['name']),
+                 ])
+                @endif
             </div>
-            <div class="mb-4">
-                <label class="block">
-                    <span class="text-gray-700 font-bold">Expiry Date</span>
-                    <input type="text" name="expiry_date" class="form-input mt-1 block w-full" placeholder="MM/YY">
-                </label>
-            </div>
-            <div class="mb-4">
-                <label class="block">
-                    <span class="text-gray-700 font-bold">Card Holder Name</span>
-                    <input type="text" name="card_holder" class="form-input mt-1 block w-full"
-                           placeholder="John Doe">
-                </label>
-            </div>
-            <div class="mb-4">
-                <label class="block">
-                    <span class="text-gray-700 font-bold">CVV</span>
-                    <input type="text" name="cvv" class="form-input mt-1 block w-full" placeholder="123">
-                </label>
-            </div>
-            <form action="{!! $paymentData['credit-card']['actionUrl'] !!}" method="POST">
-                @csrf
-                <input type="hidden" name="jsondata" value="{!! $paymentData['credit-card']['body'] !!}">
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Pay</button>
-            </form>
-        </div>
-        <div id="line-pay" class="component bg-blue-500 text-white px-4 py-2 rounded">
-            <form id="line-pay" action="{!! $paymentData['line-pay']['actionUrl'] !!}" method="POST">
-                @csrf
-                <input type="hidden" name="jsondata" value="{!! $paymentData['line-pay']['body'] !!}">
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Go To Line Pay</button>
-            </form>
-        </div>
+        @endforeach
     </div>
 
 </div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const optionForm = document.getElementById('payment-form')
-        const payComponents = document.querySelectorAll('.component')
-        payComponents.forEach(component => component.classList.add('hidden'));
-        const defaultOption = document.querySelector('input[name="option"]:checked');
+        const defaultOption = optionForm.querySelector('input[name="option"]');
         if (defaultOption) {
+            defaultOption.checked = true;
             const defaultComponent = document.getElementById(defaultOption.value);
             if (defaultComponent) {
-                defaultComponent.classList.remove('hidden')
+                defaultComponent.classList.remove('hidden');
             }
         }
 
+        const payComponents = document.querySelectorAll('.pay-component')
         optionForm.addEventListener('change', function (event) {
             if (event.target.name !== 'option') {
                 return;
@@ -119,16 +91,19 @@
             const selectedPayComponent = document.getElementById(event.target.value)
             selectedPayComponent.classList.remove('hidden')
         })
+
+
         const currencySelector = document.getElementById('currency-selector');
         const languageSelector = document.getElementById('language-selector');
 
         function redirectToUpdatedPage() {
             const currency = currencySelector.value;
             const language = languageSelector.value;
-            const newUrl = `${window.location.pathname}?currency=${currency}&language=${language}`;
+            const newUrl = `${window.location.pathname}?currency=${currency}&lang=${language}`;
             console.log(`redirect to new page ${newUrl}`);
             window.location.href = newUrl;
         }
+
         const defaultCurrencyOption = currencySelector.querySelector('option[value={{$currencyCode}}]');
         const defaultLangOption = languageSelector.querySelector('option[value={{$langCode}}]');
         if (defaultLangOption) {
