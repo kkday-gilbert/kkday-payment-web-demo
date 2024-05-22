@@ -90,14 +90,25 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function result() {
-        return view('payment_result');
+    public function result(Request $request) {
+        $jsondata = $this->decryptBody(data_get($request->all(), 'jsondata'));
+        Log::info('result.request', $jsondata);
+
+        return view('payment_result', [
+            'paymentSuccess' => $jsondata['metadata']['status'] === '0000',
+        ]);
     }
 
     private function encryptBody(string $payload)
     {
         $key = config('aes.jsondata_key');
         return GibberishAES::enc($payload, $key);
+    }
+
+    private function decryptBody(string $payload)
+    {
+        $key = config('aes.jsondata_key');
+        return json_decode(GibberishAES::dec($payload, $key), true);
     }
 
     private function getPaymentData(string $paymentMethod)
