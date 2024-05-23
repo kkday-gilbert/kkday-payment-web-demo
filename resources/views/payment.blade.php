@@ -52,7 +52,7 @@
     <div>
         @foreach($paymentList as $paymentType => $paymentData)
             <div id="{{ $paymentType }}" class="pay-component hidden">
-                @if($paymentType === 'tappay')
+                @if($paymentType === 'credit_card')
                     @include('components.credit-card',[
                         'paymentUrl' => $paymentData['data']['actionUrl'],
                         'encodedData' => $paymentData['data']['body'],
@@ -69,9 +69,6 @@
         @endforeach
     </div>
 </div>
-<pre>
-        {{ json_encode($availablePaymentChannel, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}
-</pre>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const optionForm = document.getElementById('payment-form')

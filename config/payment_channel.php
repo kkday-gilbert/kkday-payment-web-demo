@@ -9,7 +9,7 @@ return [
         'url' => '/v1/channel/linepay/reserve',
         'amount' => 1,
     ],
-    'tappay' => [
+    'travel_card' => [
         'name' => 'Tappay',
         'pmch_oid' => 248,
         'currency' => 'TWD',

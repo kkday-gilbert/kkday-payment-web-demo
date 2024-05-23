@@ -28,59 +28,20 @@ class PaymentController extends Controller
             return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), $langCode, $currencyCode));
         }
 
-        $availablePaymentList = [];
-        $conditionList = [
-            [
-                'type' => '15',
-                'value' => $currencyCode
-            ],
-            [
-                'type' => '11',
-                'value' => $langCode
-            ]
-        ];
+        $availablePaymentChannel = $this->getAvailablePaymentChannels($currencyCode, $langCode);
 
-        $list_api_endpoint = sprintf('%s/%s', config('url.kkday_payment_url'), config('url.kkday_payment_list_endpoint'));
-        $response = Http::get($list_api_endpoint, [
-            'lang_code' => $langCode,
-            'json' => [
-                'condition_list' => $conditionList,
-            ],
-            'need_detail' => '1',
-        ])->json();
-        Log::info('payment.list.response', $response);
-        $availablePaymentChannel = array_map(function ($data) {
-            return [
-                'id' => $data['pmch_oid'],
-                'name' => $data['pmch_name'],
-                'url' => $data['pmch_pay_url'],
-                'method' => $data['payment_method'],
-            ];
-        }, $response['data']['pmch_list']);
-
-
-        // mock here first to test
-        if ($langCode === 'zh-tw' && $currencyCode === 'TWD') {
-            $availablePaymentList = ['tappay', 'linepay'];
-        }
-
-        $paymentList = array_reduce($availablePaymentList, function (array $list, string $paymentType) {
-            $list[$paymentType] = $this->getPaymentData($paymentType);
-            return $list;
-        }, []);
-
-
-
-//        $paymentList = [
-//            'credit-card' => [
-//                'name' => 'Credit Card',
-//                'data' => $this->getPaymentData('tappay'),
-//            ],
-//            'line-pay' =>  [
-//                'name' => 'Line Pay',
-//                'data' => $this->getPaymentData('linepay'),
-//            ],
-//        ];
+        $paymentList = array_reduce(
+            $availablePaymentChannel,
+            function (array $list, array $pmchData) use ($currencyCode) {
+                $method = $pmchData['method'];
+                $list[$method] = [
+                    'name' => $pmchData['name'],
+                    'data' => $this->getPaymentData($method, $pmchData, $currencyCode),
+                ];
+                return $list;
+            },
+            []
+        );
 
         return view('payment', [
             'langCode' => $langCode,
@@ -90,12 +51,16 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function result(Request $request) {
+    public function result(Request $request)
+    {
         $jsondata = $this->decryptBody(data_get($request->all(), 'jsondata'));
         Log::info('result.request', $jsondata);
 
+        $isSuccess = $jsondata['metadata']['status'] === '0000';
+        $error = $isSuccess ? null : $jsondata['metadata'];
+
         return view('payment_result', [
-            'paymentSuccess' => $jsondata['metadata']['status'] === '0000',
+            'error' => $error,
         ]);
     }
 
@@ -111,26 +76,23 @@ class PaymentController extends Controller
         return json_decode(GibberishAES::dec($payload, $key), true);
     }
 
-    private function getPaymentData(string $paymentMethod)
+    private function getPaymentData(string $paymentMethod, array $pmchData, $currencyCode)
     {
-        $source_ref_no = strtoupper(Str::random(15));
         $pmch_value = config('payment_channel.' . $paymentMethod);
+        $paymentParams = Arr::get($pmch_value, 'custom_params', []);
 
         $json_body = [
             'is_3d' => Arr::get($pmch_value, 'is_3d', true),
             'pmch_oid' => Arr::get($pmch_value, 'pmch_oid', 1),
-            'pay_currency' => Arr::get($pmch_value, 'currency', 'TWD'),
+            'pay_currency' => $currencyCode,
             'pay_amount' => Arr::get($pmch_value, 'amount', 5),
 
-            // TODO: change here
-//            'return_url' => route('payment.result', ['pmch' => $paymentMethod]),
             'return_url' => route('payment.result'),
-            'cancel_url' => 'https://google.com',
-//            'cancel_url' => route('payment.cancel', ['pmch' => $paymentMethod]),
+            'cancel_url' => route('payment.result'),
 
             'payment_source_info' => [
                 'source_type' => 'KKDAY',
-                'source_ref_no' => $source_ref_no,
+                'source_ref_no' => strtoupper(Str::random(15)),
                 'source_code' => 'WEB',
             ],
             'payer_info' => [
@@ -190,18 +152,67 @@ class PaymentController extends Controller
         $jsondata = [
             'lang_code' => 'zh-tw',
             'timestamp' => time(),
-            'json' => $json_body + Arr::get($pmch_value, 'custom_params', []),
+            'json' => $json_body + $paymentParams,
         ];
 
 
         $encodedJsonData = $this->encryptBody(json_encode($jsondata));
 
-        return [
-            'name' => data_get($pmch_value, 'name', 'Unknown'),
-            'data' => [
-                'actionUrl' => config('url.kkday_payment_url') . Arr::get($pmch_value, 'url'),
+        return
+            [
+                'actionUrl' => config('url.kkday_payment_url') . '/' . Arr::get($pmchData, 'url', ''),
                 'body' => $encodedJsonData
+            ];
+    }
+
+    private function getAvailablePaymentChannels(string $currencyCode, string $langCode)
+    {
+        $conditionList = [
+            [
+                'type' => '15',
+                'value' => $currencyCode
             ],
+            [
+                'type' => '11',
+                'value' => $langCode
+            ]
         ];
+
+        $list_api_endpoint = sprintf(
+            '%s/%s',
+            config('url.kkday_payment_url'),
+            config('url.kkday_payment_list_endpoint')
+        );
+        $response = Http::get($list_api_endpoint, [
+            'lang_code' => $langCode,
+            'json' => [
+                'condition_list' => $conditionList,
+            ],
+            'need_detail' => '1',
+        ])->json();
+
+        $availablePaymentChannel = array_map(function ($data) {
+            $name = !empty($data['pmch_name']) ? $data['pmch_name'] : $data['payment_method'];
+            $name = ucwords(strtolower(str_replace("_", " ", $name)));
+            return [
+                'id' => $data['pmch_oid'],
+                'name' => $name,
+                'url' => $data['pmch_pay_url'],
+                'method' => strtolower($data['payment_method']),
+                'is_3d' => $data['is_3d'] === "1",
+            ];
+        }, $response['data']['pmch_list']);
+
+        return array_reduce(
+            $availablePaymentChannel,
+            function ($paymentWithUniqueMethod, $payment) {
+                $method = $payment['method'];
+                if (!array_key_exists($method, $paymentWithUniqueMethod)) {
+                    $paymentWithUniqueMethod[$method] = $payment;
+                }
+                return $paymentWithUniqueMethod;
+            },
+            []
+        );
     }
 }

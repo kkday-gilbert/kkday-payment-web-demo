@@ -9,7 +9,7 @@
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 <div class="bg-white p-8 rounded-lg shadow-lg text-center">
-    @if ($paymentSuccess)
+    @if (!$error)
         <h1 class="text-2xl font-bold text-green-500 mb-4">Payment Successful!</h1>
         <p class="mb-4">Your payment was processed successfully.</p>
         <button
@@ -27,5 +27,10 @@
         </button>
     @endif
 </div>
+@if($error)
+    <pre>
+        {{ json_encode($error, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}
+    </pre>
+@endif
 </body>
 </html>
