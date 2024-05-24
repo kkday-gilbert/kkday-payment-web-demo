@@ -30,4 +30,14 @@ return [
             ],
         ],
     ],
+    'credit_card' => [
+        'name' => 'Stripe v2',
+        'pmch_oid' => 403,
+        'currency' => 'TWD',
+        'is_3d' => true,
+        'url' => '/v2/channel/stripe/payment',
+        'custom_params' => [
+            'payment_param1' => 'pm_card_amex_threeDSecureNotSupported',
+        ],
+    ],
 ];
