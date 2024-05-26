@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use GibberishAES\GibberishAES;
 
-use function Symfony\Component\String\u;
-
 class PaymentController extends Controller
 {
     public function mainPage(Request $request)
@@ -32,11 +30,11 @@ class PaymentController extends Controller
 
         $paymentList = array_reduce(
             $availablePaymentChannel,
-            function (array $list, array $pmchData) use ($currencyCode) {
+            function (array $list, array $pmchData) use ($currencyCode, $langCode) {
                 $method = $pmchData['method'];
                 $list[$method] = [
                     'name' => $pmchData['name'],
-                    'data' => $this->getPaymentData($method, $pmchData, $currencyCode),
+                    'data' => $this->generatePaymentData($pmchData, $currencyCode, $langCode),
                 ];
                 return $list;
             },
@@ -76,91 +74,40 @@ class PaymentController extends Controller
         return json_decode(GibberishAES::dec($payload, $key), true);
     }
 
-    private function getPaymentData(string $paymentMethod, array $pmchData, $currencyCode)
+    private function getPaymentJsonBody(array $channel, string $currencyCode, string $lanCode)
     {
-        $pmch_value = config('payment_channel.' . $paymentMethod);
-        $paymentParams = Arr::get($pmch_value, 'custom_params', []);
+        $common = config('payment_channel.common');
+        data_set($common, 'payment_source_info.source_ref_no', Str::random(15));
+        data_set($common, 'member.member_uuid', Str::uuid()->toString());
 
-        $json_body = [
-            'is_3d' => Arr::get($pmch_value, 'is_3d', true),
-            'pmch_oid' => Arr::get($pmch_value, 'pmch_oid', 1),
+        $channelKey = data_get($channel, 'method', '');
+        $customParams = data_get(config('payment_channel'), $channelKey, []);
+        $paymentData = array_merge($common, [
             'pay_currency' => $currencyCode,
-            'pay_amount' => Arr::get($pmch_value, 'amount', 5),
+            'is_3d' => data_get($channel, 'is_3d', true),
+            'pmch_oid' => data_get($channel, 'id', 1),
 
             'return_url' => route('payment.result'),
             'cancel_url' => route('payment.result'),
 
-            'payment_source_info' => [
-                'source_type' => 'KKDAY',
-                'source_ref_no' => strtoupper(Str::random(15)),
-                'source_code' => 'WEB',
-            ],
-            'payer_info' => [
-                'first_name' => 'Su',
-                'last_name' => 'Iris',
-                'phone' => '0912345678',
-                'email' => 'susu.su@kkday.com',
-            ],
-            'member' => [
-                'member_uuid' => (string)Str::uuid(),
-                'risk_status' => '02',
-                'ip' => '172.16.1.18',
-                'register_email' => 'susu.su@kkday.com',
-                'is_verified_email' => true,
-                'register_time' => '2021-01-05 10:02:23',
-                'login_channel' => 'KKDAY',
-            ],
-            'items' => [
-                [
-                    'prod_oid' => 1,
-                    'prod_name' => 'Test Product',
-                    'product_name' => 'Test Product 01',
-                    'kkday_product_country_code_list' => ['A01-001'],
-                    'category' => 'event',
-                    'sub_categories' => ['eat', 'drink'],
-                    'item_details' => [
-                        [
-                            'unit_price' => 100,
-                            'unit_qty' => 2,
-                        ],
-                    ],
-                    'region_info' => [
-                        [
-                            'country_code' => 'TW',
-                            'city' => 'Taipei',
-                        ],
-                    ],
-                    'use_date' => '2022-09-01',
-                ],
-            ],
-            'notification_info' => [
-                'notification_type' => '02',
-                'notification_url' => 'https://the.test.url',
-            ],
-            'discount_info' => [
-                'coupons' => [
-                    [
-                        'coupon_amount' => 10,
-                        'coupon_code' => 'test1023',
-                    ],
-                ],
-                'point_amount' => 23,
-            ],
-            'payment_param3' => 'test_session_id',
-        ];
+            'custom_params' => $customParams,
+        ]);
 
-        $jsondata = [
-            'lang_code' => 'zh-tw',
+        return [
+            'lang_code' => $lanCode,
             'timestamp' => time(),
-            'json' => $json_body + $paymentParams,
+            'json' => $paymentData
         ];
+    }
 
-
-        $encodedJsonData = $this->encryptBody(json_encode($jsondata));
+    private function generatePaymentData(array $channel, string $currencyCode, string $langCode)
+    {
+        $jsonData = $this->getPaymentJsonBody($channel, $currencyCode, $langCode);
+        $encodedJsonData = $this->encryptBody(json_encode($jsonData));
 
         return
             [
-                'actionUrl' => config('url.kkday_payment_url') . '/' . Arr::get($pmchData, 'url', ''),
+                'actionUrl' => config('url.kkday_payment_url') . '/' . Arr::get($channel, 'url', ''),
                 'body' => $encodedJsonData
             ];
     }
