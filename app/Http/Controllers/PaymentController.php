@@ -2,15 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\AesHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use GibberishAES\GibberishAES;
 
 class PaymentController extends Controller
 {
+    private AesHelper $aesHelper;
+
+    public function __construct(AesHelper $aesHelper)
+    {
+        $this->aesHelper = $aesHelper;
+    }
+
     public function mainPage(Request $request)
     {
         $langCode = $request->query('lang');
@@ -44,14 +51,13 @@ class PaymentController extends Controller
         return view('payment', [
             'langCode' => $langCode,
             'currencyCode' => $currencyCode,
-            'availablePaymentChannel' => $availablePaymentChannel,
             'paymentList' => $paymentList,
         ]);
     }
 
     public function result(Request $request)
     {
-        $jsondata = $this->decryptBody(data_get($request->all(), 'jsondata'));
+        $jsondata = $this->aesHelper->decrypt(data_get($request->all(), 'jsondata'));
         Log::info('result.request', $jsondata);
 
         $isSuccess = $jsondata['metadata']['status'] === '0000';
@@ -60,18 +66,6 @@ class PaymentController extends Controller
         return view('payment_result', [
             'error' => $error,
         ]);
-    }
-
-    private function encryptBody(string $payload)
-    {
-        $key = config('aes.jsondata_key');
-        return GibberishAES::enc($payload, $key);
-    }
-
-    private function decryptBody(string $payload)
-    {
-        $key = config('aes.jsondata_key');
-        return json_decode(GibberishAES::dec($payload, $key), true);
     }
 
     private function getPaymentJsonBody(array $channel, string $currencyCode, string $lanCode)
@@ -103,7 +97,7 @@ class PaymentController extends Controller
     private function generatePaymentData(array $channel, string $currencyCode, string $langCode)
     {
         $jsonData = $this->getPaymentJsonBody($channel, $currencyCode, $langCode);
-        $encodedJsonData = $this->encryptBody(json_encode($jsonData));
+        $encodedJsonData = $this->aesHelper->encrypt($jsonData);
 
         return
             [
