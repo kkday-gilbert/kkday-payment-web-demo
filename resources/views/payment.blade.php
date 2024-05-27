@@ -11,30 +11,20 @@
 @csrf
 <div class="bg-white p-6 rounded shadow-md w-full max-w-md">
     <div class="bg-gray-200 p-4 rounded mb-6">
-        <div class="mb-4">
-            <label class="block">
-                <span class="text-gray-700 font-bold text-lg">Currency</span>
-                <select id="currency-selector" class="form-select mt-1 block w-full p-2 border border-gray-300 rounded">
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="JPY">JPY</option>
-                    <option value="TWD">TWD</option>
-                    <!-- Add more currencies as needed -->
-                </select>
-            </label>
-        </div>
-        <div class="mb-4">
-            <label class="block">
-                <span class="text-gray-700 font-bold text-lg">Language</span>
-                <select id="language-selector" class="form-select mt-1 block w-full p-2 border border-gray-300 rounded">
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="zh-tw">Chinese (Taiwan)</option>
-                    <option value="jp">Japan</option>
-                    <!-- Add more languages as needed -->
-                </select>
-            </label>
-        </div>
+        @foreach($selectionSettings as $settingKey => $setting)
+            <div id="{{$settingKey}}-setting" class="mb-4">
+                <label class="block">
+                    <span class="text-gray-700 font-bold text-lg">{{$setting['name']}}</span>
+                    <select id="{{$settingKey}}-selector" class="form-select mt-1 block w-full p-2 border border-gray-300 rounded">
+                        @foreach($setting['value'] as $valueEnum)
+                            <option value="{{ $valueEnum->getValue() }}">
+                                {{ $valueEnum->getName() }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+            </div>
+        @endforeach
     </div>
 
     <h2 class="text-2xl font-bold mb-4"> Select Payment Method </h2>

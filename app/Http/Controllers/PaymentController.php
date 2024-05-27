@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Currency;
+use App\Enums\Language;
 use App\Helpers\AesHelper;
 use App\Services\PaymentChannelApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use UnexpectedValueException;
 
 class PaymentController extends Controller
 {
@@ -22,22 +25,19 @@ class PaymentController extends Controller
 
     public function mainPage(Request $request)
     {
-        $langCode = $request->query('lang');
-        $currencyCode = $request->query('currency');
-
-        if (!$langCode || !$currencyCode) {
-            $langCode = $langCode ?? 'zh-tw';
-            $currencyCode = $currencyCode ?? 'TWD';
-            Log::info('payment.query', [
-                'lang' => $langCode,
-                'currency' => $currencyCode,
+        try {
+            $langCode = Language::from($request->query('lang'));
+            $currencyCode = Currency::from($request->query('currency'));
+        } catch (UnexpectedValueException $e) {
+            Log::error('payment.main-page', [
+                'error' => $e->getMessage(),
             ]);
-            return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), $langCode, $currencyCode));
+            return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), Language::CHINESE_TRADITIONAL_TAIWAN, Currency::TWD));
         }
 
         $availablePaymentChannel = $this->paymentChannelApiService->getAvailablePaymentChannels([
-            'lang' => $langCode,
-            'currency' => $currencyCode,
+            'lang' => $langCode->getValue(),
+            'currency' => $currencyCode->getValue(),
         ]);
 
         $paymentList = array_reduce(
@@ -54,9 +54,10 @@ class PaymentController extends Controller
         );
 
         return view('payment', [
-            'langCode' => $langCode,
-            'currencyCode' => $currencyCode,
+            'langCode' => $langCode->getValue(),
+            'currencyCode' => $currencyCode->getValue(),
             'paymentList' => $paymentList,
+            'selectionSettings' => $this->getSelectionSettings(),
         ]);
     }
 
@@ -71,6 +72,21 @@ class PaymentController extends Controller
         return view('payment_result', [
             'error' => $error,
         ]);
+    }
+    private function getSelectionSettings(): array {
+        $currencyList = Currency::values();
+        $langList = Language::values();
+
+        return [
+            'language' => [
+                'name' => 'Language',
+                'value' => $langList,
+            ],
+            'currency' => [
+                'name' => 'Currency',
+                'value' => $currencyList,
+            ],
+        ];
     }
 
     private function getPaymentJsonBody(array $channel, string $currencyCode, string $lanCode)
