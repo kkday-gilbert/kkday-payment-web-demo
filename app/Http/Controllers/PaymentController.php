@@ -116,6 +116,10 @@ class PaymentController extends Controller
             [
                 'type' => '11',
                 'value' => $langCode
+            ],
+            [
+                "type" => "19",
+                "value" => "MAIN_APP"
             ]
         ];
 
