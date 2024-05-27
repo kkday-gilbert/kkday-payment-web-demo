@@ -3,19 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\AesHelper;
+use App\Services\PaymentChannelApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PaymentController extends Controller
 {
     private AesHelper $aesHelper;
+    private PaymentChannelApiService $paymentChannelApiService;
 
-    public function __construct(AesHelper $aesHelper)
+    public function __construct(AesHelper $aesHelper, PaymentChannelApiService $paymentChannelApiService)
     {
         $this->aesHelper = $aesHelper;
+        $this->paymentChannelApiService = $paymentChannelApiService;
     }
 
     public function mainPage(Request $request)
@@ -33,7 +35,10 @@ class PaymentController extends Controller
             return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), $langCode, $currencyCode));
         }
 
-        $availablePaymentChannel = $this->getAvailablePaymentChannels($currencyCode, $langCode);
+        $availablePaymentChannel = $this->paymentChannelApiService->getAvailablePaymentChannels([
+            'lang' => $langCode,
+            'currency' => $currencyCode,
+        ]);
 
         $paymentList = array_reduce(
             $availablePaymentChannel,
@@ -104,60 +109,5 @@ class PaymentController extends Controller
                 'actionUrl' => config('url.kkday_payment_url') . '/' . Arr::get($channel, 'url', ''),
                 'body' => $encodedJsonData
             ];
-    }
-
-    private function getAvailablePaymentChannels(string $currencyCode, string $langCode)
-    {
-        $conditionList = [
-            [
-                'type' => '15',
-                'value' => $currencyCode
-            ],
-            [
-                'type' => '11',
-                'value' => $langCode
-            ],
-            [
-                "type" => "19",
-                "value" => "MAIN_APP"
-            ]
-        ];
-
-        $list_api_endpoint = sprintf(
-            '%s/%s',
-            config('url.kkday_payment_url'),
-            config('url.kkday_payment_list_endpoint')
-        );
-        $response = Http::get($list_api_endpoint, [
-            'lang_code' => $langCode,
-            'json' => [
-                'condition_list' => $conditionList,
-            ],
-            'need_detail' => '1',
-        ])->json();
-
-        $availablePaymentChannel = array_map(function ($data) {
-            $name = !empty($data['pmch_name']) ? $data['pmch_name'] : $data['payment_method'];
-            $name = ucwords(strtolower(str_replace("_", " ", $name)));
-            return [
-                'id' => $data['pmch_oid'],
-                'name' => $name,
-                'url' => $data['pmch_pay_url'],
-                'method' => strtolower($data['payment_method']),
-                'is_3d' => $data['is_3d'] === "1",
-            ];
-        }, $response['data']['pmch_list']);
-
-        return array_reduce(
-            $availablePaymentChannel,
-            function ($paymentWithUniqueMethod, $payment) {
-                $method = $payment['method'];
-                if (!array_key_exists($method, $paymentWithUniqueMethod)) {
-                    $paymentWithUniqueMethod[$method] = $payment;
-                }
-                return $paymentWithUniqueMethod;
-            },
-            []
-        );
     }
 }
