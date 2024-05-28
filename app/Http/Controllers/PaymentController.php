@@ -32,7 +32,14 @@ class PaymentController extends Controller
             Log::error('payment.main-page', [
                 'error' => $e->getMessage(),
             ]);
-            return redirect(sprintf("%s?lang=%s&currency=%s", route('payment.main-page'), Language::CHINESE_TRADITIONAL_TAIWAN, Currency::TWD));
+            return redirect(
+                sprintf(
+                    "%s?lang=%s&currency=%s",
+                    route('payment.main-page'),
+                    Language::CHINESE_TRADITIONAL_TAIWAN,
+                    Currency::TWD
+                )
+            );
         }
 
         $availablePaymentChannel = $this->paymentChannelApiService->getAvailablePaymentChannels([
@@ -73,7 +80,9 @@ class PaymentController extends Controller
             'error' => $error,
         ]);
     }
-    private function getSelectionSettings(): array {
+
+    private function getSelectionSettings(): array
+    {
         $currencyList = Currency::values();
         $langList = Language::values();
 
@@ -97,16 +106,18 @@ class PaymentController extends Controller
 
         $channelKey = data_get($channel, 'method', '');
         $customParams = data_get(config('payment_channel'), $channelKey, []);
-        $paymentData = array_merge($common, [
-            'pay_currency' => $currencyCode,
-            'is_3d' => data_get($channel, 'is_3d', true),
-            'pmch_oid' => data_get($channel, 'id', 1),
+        $paymentData = array_merge(
+            $common,
+            [
+                'pay_currency' => $currencyCode,
+                'is_3d' => data_get($channel, 'is_3d', true),
+                'pmch_oid' => data_get($channel, 'id', 1),
 
-            'return_url' => route('payment.result'),
-            'cancel_url' => route('payment.result'),
-
-            'custom_params' => $customParams,
-        ]);
+                'return_url' => route('payment.result'),
+                'cancel_url' => route('payment.result'),
+            ],
+            $customParams
+        );
 
         return [
             'lang_code' => $lanCode,
